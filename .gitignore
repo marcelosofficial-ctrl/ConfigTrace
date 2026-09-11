@@ -1,0 +1,9 @@
+/target/
+/dist/
+*.tmp
+*.ctsnapshot.json
+test-output/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

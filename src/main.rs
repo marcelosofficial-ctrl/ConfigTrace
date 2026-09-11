@@ -1,10 +1,11 @@
 use configtrace_core::{
-    DiffReport, FieldChangeKind, FileChangeKind, SnapshotOptions, compare_snapshots, load_snapshot,
-    save_snapshot, snapshot_directory,
+    DiffReport, FieldChangeKind, FileChangeKind, SnapshotOptions, WatchOptions, compare_snapshots,
+    load_snapshot, save_snapshot, snapshot_directory, watch_directory,
 };
 use std::env;
 use std::path::{Path, PathBuf};
 use std::process;
+use std::time::Duration;
 
 const VERSION: &str = "0.1.0-dev";
 
@@ -26,6 +27,7 @@ fn run() -> Result<(), String> {
     match command {
         "snapshot" => command_snapshot(&arguments[1..]),
         "diff" => command_diff(&arguments[1..]),
+        "watch" => command_watch(&arguments[1..]),
         "version" | "--version" | "-v" => {
             println!("ConfigTrace {VERSION}");
             Ok(())
@@ -75,7 +77,6 @@ fn command_snapshot(arguments: &[String]) -> Result<(), String> {
     }
 
     let output = output.ok_or_else(|| "--out <snapshot.json> is required".to_owned())?;
-
     let absolute_output = absolute_path(&output)?;
 
     let options = SnapshotOptions {
@@ -128,6 +129,82 @@ fn command_diff(arguments: &[String]) -> Result<(), String> {
     Ok(())
 }
 
+fn command_watch(arguments: &[String]) -> Result<(), String> {
+    if arguments.is_empty() {
+        return Err(
+            "usage: configtrace watch <directory> --out <journal.jsonl> \
+             [--duration <500ms|10s|5m>] [--settle <duration>] [--label <name>]"
+                .to_owned(),
+        );
+    }
+
+    let root = PathBuf::from(&arguments[0]);
+    let mut output: Option<PathBuf> = None;
+    let mut duration: Option<Duration> = None;
+    let mut settle = Duration::from_millis(200);
+    let mut label: Option<String> = None;
+
+    let mut index = 1;
+
+    while index < arguments.len() {
+        match arguments[index].as_str() {
+            "--out" => {
+                index += 1;
+                let Some(value) = arguments.get(index) else {
+                    return Err("--out requires a file path".to_owned());
+                };
+                output = Some(PathBuf::from(value));
+            }
+            "--duration" => {
+                index += 1;
+                let Some(value) = arguments.get(index) else {
+                    return Err("--duration requires a duration".to_owned());
+                };
+                duration = Some(parse_duration(value)?);
+            }
+            "--settle" => {
+                index += 1;
+                let Some(value) = arguments.get(index) else {
+                    return Err("--settle requires a duration".to_owned());
+                };
+                settle = parse_duration(value)?;
+            }
+            "--label" => {
+                index += 1;
+                let Some(value) = arguments.get(index) else {
+                    return Err("--label requires text".to_owned());
+                };
+                label = Some(value.clone());
+            }
+            unknown => return Err(format!("unknown watch option {unknown:?}")),
+        }
+
+        index += 1;
+    }
+
+    let output = output.ok_or_else(|| "--out <journal.jsonl> is required".to_owned())?;
+
+    let result = watch_directory(
+        &root,
+        &output,
+        &WatchOptions {
+            label,
+            settle,
+            duration,
+        },
+    )?;
+
+    println!(
+        "watch=PASS changes={} batches={} warnings={} out={}",
+        result.changes,
+        result.batches,
+        result.warnings,
+        absolute_path(&output)?.display()
+    );
+
+    Ok(())
+}
+
 fn print_human_diff(report: &DiffReport) {
     println!(
         "added={} removed={} modified={} unchanged={}",
@@ -169,6 +246,34 @@ fn print_human_diff(report: &DiffReport) {
     }
 }
 
+fn parse_duration(value: &str) -> Result<Duration, String> {
+    let (number, multiplier) = if let Some(number) = value.strip_suffix("ms") {
+        (number, 1_u64)
+    } else if let Some(number) = value.strip_suffix('s') {
+        (number, 1_000_u64)
+    } else if let Some(number) = value.strip_suffix('m') {
+        (number, 60_000_u64)
+    } else {
+        return Err(format!(
+            "invalid duration {value:?}; use an integer followed by ms, s, or m"
+        ));
+    };
+
+    let amount = number
+        .parse::<u64>()
+        .map_err(|_| format!("invalid duration {value:?}"))?;
+
+    let milliseconds = amount
+        .checked_mul(multiplier)
+        .ok_or_else(|| format!("duration is too large: {value:?}"))?;
+
+    if milliseconds == 0 {
+        return Err("duration must be greater than zero".to_owned());
+    }
+
+    Ok(Duration::from_millis(milliseconds))
+}
+
 fn absolute_path(path: &Path) -> Result<PathBuf, String> {
     if path.is_absolute() {
         return Ok(path.to_path_buf());
@@ -186,9 +291,30 @@ fn print_usage() {
          Usage:\n\
            configtrace snapshot <directory> --out <snapshot.json> [--label <name>]\n\
            configtrace diff <before.json> <after.json> [--json]\n\
+           configtrace watch <directory> --out <journal.jsonl> [--duration 10s] [--settle 200ms] [--label <name>]\n\
            configtrace version\n\
          \n\
          CrashScope integration:\n\
-           Use snapshot files plus `diff --json`. The machine contract is schema_version 1."
+           Snapshot/diff contract: schema_version 1.\n\
+           Journal JSONL contract: schema_version 1."
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn duration_parser_supports_ms_seconds_and_minutes() {
+        assert_eq!(parse_duration("250ms").unwrap(), Duration::from_millis(250));
+        assert_eq!(parse_duration("3s").unwrap(), Duration::from_secs(3));
+        assert_eq!(parse_duration("2m").unwrap(), Duration::from_secs(120));
+    }
+
+    #[test]
+    fn duration_parser_rejects_invalid_values() {
+        assert!(parse_duration("0s").is_err());
+        assert!(parse_duration("1.5s").is_err());
+        assert!(parse_duration("10").is_err());
+    }
 }

@@ -1,4 +1,5 @@
 pub mod diff;
+pub mod journal;
 pub mod model;
 pub mod snapshot;
 pub mod structured;
@@ -9,3 +10,5 @@ pub use model::{
     SCHEMA_VERSION, Snapshot, SnapshotOptions, StructuredField,
 };
 pub use snapshot::{load_snapshot, save_snapshot, snapshot_directory};
+
+pub use journal::{JournalRecord, WatchOptions, WatchResult, watch_directory};

@@ -1,69 +1,114 @@
 # ConfigTrace
 
-ConfigTrace is an open configuration-change tracing engine and CLI.
+ConfigTrace is an open, standalone configuration-change tracing engine for games and applications.
 
-It is intentionally independent from any one application so other tools can consume it through a stable machine-readable contract. The first intended integration is CrashScope 1.1.
+It can be used by itself or as a diagnostic evidence source for another program such as CrashScope.
 
-## Why
+## What it does
 
-A crash report becomes much more useful when it can answer questions such as:
+ConfigTrace can:
 
-- Did a game rewrite its graphics configuration shortly before the crash?
-- Did HDR, resolution, renderer, or quality settings change?
-- Was a config file added, removed, or modified?
-- Which structured settings changed between two points in time?
+- snapshot a configuration directory;
+- fingerprint regular files with streaming SHA-256;
+- compare snapshots deterministically;
+- show field-level JSON and INI/CFG/CONF/property changes;
+- redact sensitive-looking values while still detecting that they changed;
+- watch a configuration tree using the platform's native filesystem notification mechanism;
+- convert noisy raw filesystem activity into a timestamped semantic JSONL journal.
 
-ConfigTrace captures lightweight snapshots and compares them deterministically.
-
-## Commands
+## CLI
 
 ```powershell
-configtrace snapshot "C:\path\to\config" --out before.json --label "session-start"
-configtrace snapshot "C:\path\to\config" --out after.json --label "crash-time"
+configtrace snapshot "C:\path\to\config" --out before.json --label session-start
+configtrace snapshot "C:\path\to\config" --out after.json --label crash-time
 
 configtrace diff before.json after.json
 configtrace diff before.json after.json --json
+
+configtrace watch "C:\path\to\config" --out session.jsonl --settle 200ms --label game-session
+
+configtrace version
 ```
 
-## Open integration contract
+`watch` runs until stopped unless `--duration` is supplied.
 
-ConfigTrace 0.1 uses `schema_version: 1`.
+## Machine contracts
 
-The Rust library exposes the core snapshot and comparison functions. The CLI is only a thin adapter around that core.
+Snapshot and diff JSON use schema version 1:
 
-CrashScope can therefore begin integration safely by:
+`docs/CONTRACT_V1.md`
 
-1. invoking `configtrace.exe`;
-2. storing snapshot JSON locally;
-3. parsing `configtrace diff ... --json`;
-4. correlating ConfigTrace timestamps and changes with CrashScope incidents.
+Live journal JSONL uses schema version 1:
 
-No native DLL/FFI dependency is required for the first integration.
+`docs/JOURNAL_CONTRACT_V1.md`
+
+## CrashScope integration
+
+The recommended first CrashScope integration is process isolation:
+
+1. CrashScope selects the relevant configuration root.
+2. CrashScope launches `configtrace watch`.
+3. CrashScope waits for the `session_start` JSONL record.
+4. ConfigTrace records semantic changes throughout the session.
+5. At incident time CrashScope reads a bounded pre-incident window.
+6. CrashScope presents nearby changes as correlation evidence.
+
+ConfigTrace deliberately does not claim that a nearby setting change caused a crash.
 
 ## Privacy
 
-ConfigTrace never uploads data.
+Potentially sensitive structured values are represented as:
 
-Structured settings with sensitive-looking names such as passwords, tokens, authorization values, cookies, and session IDs are redacted. ConfigTrace retains a SHA-256 fingerprint of the value so it can detect that the secret changed without recording the secret itself.
+```text
+<redacted>
+```
 
-## Current parsing
+ConfigTrace uses an internal SHA-256 value fingerprint so it can detect that a secret changed without storing or emitting the plaintext secret.
 
-- JSON: structured field-level comparison
-- INI / CFG / CONF / properties: key/value field-level comparison
-- other text: whole-file fingerprint
-- binary / unknown: whole-file fingerprint
+## Parsing
 
-All files receive a streaming SHA-256 fingerprint.
+Field-level:
+
+- JSON
+- INI
+- CFG
+- CONF
+- properties
+
+Whole-file fingerprint:
+
+- other text
+- binary / unknown files
+
+## Resource philosophy
+
+ConfigTrace's live watcher is event-driven. It does not continuously rescan configuration trees on a fixed high-frequency polling loop.
+
+Raw filesystem notifications are only wake-up signals. After a short quiet period ConfigTrace creates a semantic snapshot and records meaningful changes.
+
+See `docs/RESOURCE_VALIDATION.md` for the local 1.0 validation measurements.
 
 ## Safety
 
-- selected directories only
-- read-only source scanning
-- symlinks are skipped
-- `.git` and `target` directories are ignored
-- snapshot output can live inside the scanned tree without snapshotting itself
-- snapshots are committed through a temporary file
-- no accounts
-- no telemetry
-- no registry modification
-- no service installation
+- source configuration files are read only;
+- symlinks are skipped;
+- `.git` and `target` trees are ignored;
+- no accounts;
+- no telemetry;
+- no network service;
+- no registry modification;
+- no Windows service installation;
+- no administrator privileges required.
+
+## Build
+
+```powershell
+cargo fmt --all -- --check
+cargo clippy --all-targets --all-features -- -D warnings
+cargo test --all-targets
+cargo build --release
+```
+
+## License
+
+MIT

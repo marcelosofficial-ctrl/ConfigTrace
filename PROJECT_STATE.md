@@ -4,7 +4,7 @@
 
 ConfigTrace is an open, standalone configuration-change tracing engine for games and applications.
 
-It is intentionally independent from CrashScope. CrashScope 1.1 can consume ConfigTrace through schema-versioned JSON/JSONL without duplicating its logic or linking directly to Rust ABI.
+It is independent from CrashScope. CrashScope 1.1 can consume ConfigTrace through stable schema-versioned JSON/JSONL contracts without duplicating its logic or linking directly to Rust ABI.
 
 ## Portfolio role
 
@@ -14,19 +14,26 @@ Focused Project demonstrating:
 - public core-library design
 - deterministic filesystem snapshots
 - streaming SHA-256
-- structured JSON / INI-style parsing
+- structured configuration parsing
 - privacy-aware redaction
 - native event-driven filesystem watching
-- semantic debouncing
-- stable machine-readable integration contracts
+- semantic debounce / stabilization
+- JSONL event journaling
+- integration contract design
+- resource-conscious background tooling
+- release engineering
 
 ## Milestones
 
 CT-01: Rust bootstrap, public core library, snapshot model, CLI. COMPLETE.
-CT-02: deterministic diff, structured field changes, secret redaction, snapshot/diff contract. COMPLETE.
-CT-03: event-driven timestamped watch/journal mode for near-crash correlation. COMPLETE.
-CT-04: resource validation, packaging, final docs, local 1.0 release candidate. NEXT.
-CT-1.0: later GitHub/portfolio publication.
+CT-02: deterministic diff, field-level structured changes, secret redaction, snapshot/diff contract. COMPLETE.
+CT-03: timestamped event-driven semantic journal. COMPLETE.
+CT-04: performance validation, documentation, standalone packaging, clean extraction validation. COMPLETE.
+CT-1.0: GitHub publication and portfolio integration. DEFERRED.
+
+## Version
+
+1.0.0 local release candidate
 
 ## Current commands
 
@@ -36,82 +43,81 @@ configtrace diff <before.json> <after.json> --json
 configtrace watch <directory> --out <journal.jsonl> [--duration 10s] [--settle 200ms] [--label <name>]
 configtrace version
 
-## Machine contracts
+## Contracts
 
 Snapshot/diff schema: v1
-Document: docs/CONTRACT_V1.md
+docs/CONTRACT_V1.md
 
 Journal schema: v1
-Document: docs/JOURNAL_CONTRACT_V1.md
-
-## CT-03 journal architecture
-
-ConfigTrace uses the platform-recommended filesystem watcher.
-
-Raw filesystem notifications are treated only as wake-up signals.
-
-After activity, ConfigTrace waits for a short quiet/settle period, takes a semantic snapshot, compares it with the previous baseline, and writes only meaningful file/config changes to JSONL.
-
-This avoids exposing duplicate/noisy raw watcher events to CrashScope.
-
-Journal records:
-
-session_start
-change
-watch_warning
-session_end
-
-Each change record includes a monotonic sequence number and observed_unix_ms timestamp.
+docs/JOURNAL_CONTRACT_V1.md
 
 ## CrashScope 1.1 boundary
 
-Recommended first integration:
+Recommended initial integration remains process-isolated:
 
-1. CrashScope selects relevant game/application config roots.
-2. CrashScope launches ConfigTrace as a child process.
+1. CrashScope selects relevant configuration roots.
+2. CrashScope launches ConfigTrace.
 3. CrashScope waits for session_start.
-4. ConfigTrace records semantic JSONL changes during the monitored session.
-5. At incident time CrashScope reads a bounded pre-incident window.
-6. CrashScope presents nearby config changes as correlation evidence.
-
-CrashScope must not claim that a nearby ConfigTrace event caused a crash without separate evidence.
+4. ConfigTrace writes semantic JSONL evidence.
+5. CrashScope correlates nearby change records with an incident.
+6. CrashScope presents changes as correlation evidence, not proof of causation.
 
 ## Privacy
 
-Sensitive-looking values remain <redacted> in snapshots, diffs, and journal entries.
+Potentially sensitive structured values are never emitted as plaintext.
 
-A SHA-256 value fingerprint is retained internally in snapshot state so ConfigTrace can detect a secret changed without recording its plaintext.
+ConfigTrace stores <redacted> in serialized structured evidence while preserving SHA-256 value fingerprints in snapshot state for change detection.
+
+The CT-04 active and clean-package tests explicitly scanned output for injected secret strings and found none.
 
 ## Validation
 
-Validated: 2026-09-11 19:23:21 +09:00
+Validated: 2026-09-11 19:44:57 +09:00
+Authoritative pre-CT04 commit: 103daf1
+Version: 1.0.0
 rustfmt: PASS
-clippy -D warnings: PASS
+Clippy -D warnings: PASS
 Tests: 16 PASS
-Release build: PASS
-CT-02 snapshot/diff regression: PASS
-Native watch session_start: PASS
-Semantic watch journal: PASS
-Added-file watch event: PASS
-Removed-file watch event: PASS
-JSON field-level watch diff: PASS
-Journal secret redaction: PASS
-Monotonic change sequence: PASS
-Snapshot contract v1: PASS
-Journal contract v1: PASS
-Executable size: 532.5 KiB
+
+Idle watcher:
+- duration: 10 s
+- peak working set: 4.3 MB
+- peak private memory: 0.8 MB
+- CPU time: 0.016 s
+- semantic changes: 0
+
+Active watcher:
+- duration: 8 s
+- semantic changes: 5
+- peak working set: 4.3 MB
+- peak private memory: 0.9 MB
+- CPU time: 0 s
+
+Journal:
+- JSONL parse: PASS
+- session lifecycle: PASS
+- monotonic timestamps: PASS
+- contiguous sequence numbers: PASS
+- semantic added/removed/modified evidence: PASS
+- secret plaintext leak check: PASS
+
+Release:
+- executable size: 532.5 KiB
+- ZIP: dist/release/ConfigTrace-1.0.0-win-x64.zip
+- ZIP size: 264 KiB
+- ZIP SHA-256: 60f20f240657af20bc1ba6a5d9489962e6f34801d4ec38b812b321e0cd89e4c9
+- clean extraction version smoke: PASS
+- clean extraction snapshot/diff smoke: PASS
+- clean extraction watcher smoke: PASS
+- clean extraction secret-leak smoke: PASS
 
 ## GitHub status
 
-Local development only.
+Development remains local.
 No GitHub operations or GitHub Actions were used.
 
-## Next milestone
+## Freeze
 
-CT-04:
-- measure idle watcher CPU/memory
-- measure change-processing overhead
-- validate long-running journal behavior
-- package standalone Windows x64 release
-- clean-extraction validation
-- freeze local 1.0 candidate
+ConfigTrace 1.0 is feature-frozen after CT-04.
+
+The next ConfigTrace work should be publication/preflight or a future post-1.0 milestone driven by a real CrashScope integration requirement. Do not expand 1.0 simply to add features.

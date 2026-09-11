@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use std::process;
 use std::time::Duration;
 
-const VERSION: &str = "0.1.0-dev";
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn main() {
     if let Err(error) = run() {

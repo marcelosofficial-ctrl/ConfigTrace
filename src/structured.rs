@@ -49,12 +49,7 @@ pub fn parse_structured(
 }
 
 pub fn is_sensitive_key(key: &str) -> bool {
-    let lower = key.to_ascii_lowercase();
-
-    let normalized: String = lower
-        .chars()
-        .map(|ch| if ch.is_ascii_alphanumeric() { ch } else { '_' })
-        .collect();
+    let normalized = normalize_sensitive_key(key);
 
     SENSITIVE_TERMS.iter().any(|term| {
         normalized == *term
@@ -62,6 +57,42 @@ pub fn is_sensitive_key(key: &str) -> bool {
             || normalized.ends_with(&format!("_{term}"))
             || normalized.contains(&format!("_{term}_"))
     })
+}
+
+fn normalize_sensitive_key(key: &str) -> String {
+    let chars: Vec<char> = key.chars().collect();
+    let mut normalized = String::with_capacity(chars.len() + 4);
+
+    for (index, ch) in chars.iter().copied().enumerate() {
+        if !ch.is_ascii_alphanumeric() {
+            if !normalized.is_empty() && !normalized.ends_with('_') {
+                normalized.push('_');
+            }
+            continue;
+        }
+
+        let previous = index
+            .checked_sub(1)
+            .and_then(|value| chars.get(value))
+            .copied();
+        let next = chars.get(index + 1).copied();
+
+        let camel_boundary = ch.is_ascii_uppercase()
+            && previous.is_some_and(|value| {
+                value.is_ascii_lowercase()
+                    || value.is_ascii_digit()
+                    || (value.is_ascii_uppercase()
+                        && next.is_some_and(|next_value| next_value.is_ascii_lowercase()))
+            });
+
+        if camel_boundary && !normalized.is_empty() && !normalized.ends_with('_') {
+            normalized.push('_');
+        }
+
+        normalized.push(ch.to_ascii_lowercase());
+    }
+
+    normalized.trim_matches('_').to_owned()
 }
 
 fn parse_json(bytes: &[u8]) -> Result<BTreeMap<String, StructuredField>, String> {
@@ -210,8 +241,19 @@ mod tests {
     fn ordinary_key_names_are_not_over_redacted() {
         assert!(!is_sensitive_key("keybind_forward"));
         assert!(!is_sensitive_key("keyboard_layout"));
+        assert!(!is_sensitive_key("tokenizer_model"));
         assert!(is_sensitive_key("api_key"));
         assert!(is_sensitive_key("user_password"));
+    }
+
+    #[test]
+    fn camel_and_pascal_case_secret_keys_are_redacted() {
+        assert!(is_sensitive_key("apiToken"));
+        assert!(is_sensitive_key("accessToken"));
+        assert!(is_sensitive_key("refreshToken"));
+        assert!(is_sensitive_key("clientSecret"));
+        assert!(is_sensitive_key("sessionId"));
+        assert!(is_sensitive_key("APIKey"));
     }
 
     #[test]

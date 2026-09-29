@@ -4,6 +4,18 @@ ConfigTrace is an open, standalone configuration-change tracing engine for games
 
 It can be used by itself or as a diagnostic evidence source for another program such as CrashScope.
 
+## Download
+
+Current Windows release: **ConfigTrace 1.0.1**
+
+- [Download ConfigTrace 1.0.1](https://github.com/marcelosofficial-ctrl/ConfigTrace/releases/tag/v1.0.1)
+- Release ZIP: `ConfigTrace-1.0.1-win-x64.zip`
+- SHA-256: `9374128c42e3bf3e1fd8f48bdddd7485e421da543c80f54d454985e1bcccbafe`
+- [Portfolio case study](https://marcelosofficial-ctrl.github.io/portfolio/projects/configtrace/)
+
+The release is standalone and keeps the same process-isolated JSON/JSONL contract used by CrashScope.
+
+
 ## What it does
 
 ConfigTrace can:

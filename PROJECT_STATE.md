@@ -4,7 +4,7 @@
 
 ConfigTrace is an open, standalone configuration-change tracing engine for games and applications.
 
-It is independent from CrashScope. CrashScope 1.1 can consume ConfigTrace through stable schema-versioned JSON/JSONL contracts without duplicating its logic or linking directly to Rust ABI.
+It is independent from CrashScope. CrashScope 1.2 can consume ConfigTrace 1.0.1 through stable schema-versioned JSON/JSONL contracts without duplicating its logic or linking directly to Rust ABI.
 
 ## Portfolio role
 
@@ -29,11 +29,12 @@ CT-01: Rust bootstrap, public core library, snapshot model, CLI. COMPLETE.
 CT-02: deterministic diff, field-level structured changes, secret redaction, snapshot/diff contract. COMPLETE.
 CT-03: timestamped event-driven semantic journal. COMPLETE.
 CT-04: performance validation, documentation, standalone packaging, clean extraction validation. COMPLETE.
-CT-1.0: GitHub publication and portfolio integration. DEFERRED.
+CT-1.0: GitHub publication and portfolio integration. COMPLETE.
+CT-1.0.1: sensitive-key redaction maintenance release driven by CrashScope integration. COMPLETE.
 
 ## Version
 
-1.0.0 local release candidate
+1.0.1 public release
 
 ## Current commands
 
@@ -51,7 +52,7 @@ docs/CONTRACT_V1.md
 Journal schema: v1
 docs/JOURNAL_CONTRACT_V1.md
 
-## CrashScope 1.1 boundary
+## CrashScope 1.2 boundary
 
 Recommended initial integration remains process-isolated:
 
@@ -73,8 +74,8 @@ The CT-04 active and clean-package tests explicitly scanned output for injected 
 ## Validation
 
 Validated: 2026-09-11 19:44:57 +09:00
-Authoritative pre-CT04 commit: 103daf1
-Version: 1.0.0
+Authoritative 1.0.1 public commit: b629c970dfc14fca5df1e0ef2b0d1d07d0d8c56c
+Version: 1.0.1
 rustfmt: PASS
 Clippy -D warnings: PASS
 Tests: 16 PASS
@@ -102,10 +103,9 @@ Journal:
 - secret plaintext leak check: PASS
 
 Release:
-- executable size: 532.5 KiB
-- ZIP: dist/release/ConfigTrace-1.0.0-win-x64.zip
-- ZIP size: 264 KiB
-- ZIP SHA-256: 60f20f240657af20bc1ba6a5d9489962e6f34801d4ec38b812b321e0cd89e4c9
+- public release: https://github.com/marcelosofficial-ctrl/ConfigTrace/releases/tag/v1.0.1
+- ZIP: ConfigTrace-1.0.1-win-x64.zip
+- ZIP SHA-256: 9374128c42e3bf3e1fd8f48bdddd7485e421da543c80f54d454985e1bcccbafe
 - clean extraction version smoke: PASS
 - clean extraction snapshot/diff smoke: PASS
 - clean extraction watcher smoke: PASS
@@ -113,11 +113,14 @@ Release:
 
 ## GitHub status
 
-Development remains local.
-No GitHub operations or GitHub Actions were used.
+Public repository: https://github.com/marcelosofficial-ctrl/ConfigTrace
+Current public release: v1.0.1
+Portfolio case study: https://marcelosofficial-ctrl.github.io/portfolio/projects/configtrace/
 
-## Freeze
+ConfigTrace 1.0.1 is publicly released and remains independently usable as a standalone utility.
 
-ConfigTrace 1.0 is feature-frozen after CT-04.
+## Current maintenance state
 
-The next ConfigTrace work should be publication/preflight or a future post-1.0 milestone driven by a real CrashScope integration requirement. Do not expand 1.0 simply to add features.
+ConfigTrace 1.0.1 is released. The 1.0.1 maintenance release fixed camelCase/PascalCase sensitive-key recognition discovered through real CrashScope integration.
+
+Future ConfigTrace work should be driven by a concrete standalone or integration requirement. Keep the process-isolated schema-versioned boundary stable.
